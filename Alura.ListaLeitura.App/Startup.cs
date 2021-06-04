@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -27,10 +28,43 @@ namespace Alura.ListaLeitura.App
             builder.MapRoute("Livros/Lidos", LivrosLidos);
             builder.MapRoute("Livros/NovoLivro/{titulo}/{autor}", NovoLivroParaLer);
             builder.MapRoute("Livros/Detalhes/{id:int}", ExibeDetalhes);
+            builder.MapRoute("Cadastro/NovoLivro", ExibeFormulario);
+            builder.MapRoute("Cadastro/Incluir", ProcessaFormulario);
 
             var rotas = builder.Build();
             app.UseRouter(rotas);
             //app.Run(Roteamento);
+        }
+
+        private Task ProcessaFormulario(HttpContext context)
+        {
+            var livro = new Livro
+            {
+                Titulo = context.Request.Form["titulo"].First(),
+                Autor = context.Request.Form["autor"].First()
+            };
+
+            var repo = new LivroRepositorioCSV();
+            repo.Incluir(livro);
+
+            return context.Response.WriteAsync("O livro foi adicionado com sucesso.");
+        }
+
+        private Task ExibeFormulario(HttpContext context)
+        {
+            var html = Convert.ToString(CarregaArquivoHTML("Formulario"));
+
+            return context.Response.WriteAsync(html);
+        }
+
+        private object CarregaArquivoHTML(string nomeDoArquivo)
+        {
+            var nomeCompletoDoArquivo = $"HTML/{nomeDoArquivo}.html";
+
+            using (var arquivo = File.OpenText(nomeCompletoDoArquivo))
+            {
+                return arquivo.ReadToEnd();
+            }
         }
 
         private Task ExibeDetalhes(HttpContext context)
@@ -86,6 +120,15 @@ namespace Alura.ListaLeitura.App
         public Task LivrosParaLer(HttpContext context)
         {
             var _repo = new LivroRepositorioCSV();
+            var conteudoDoArquivo = Convert.ToString(CarregaArquivoHTML("para-ler"));
+
+            foreach (var livro in _repo.ParaLer.Livros)
+            {
+                conteudoDoArquivo = conteudoDoArquivo.Replace("#NOVO-ITEM#", $"<li>{livro.Titulo} - {livro.Autor}</li>#NOVO-ITEM#");
+            }
+
+            conteudoDoArquivo = conteudoDoArquivo.Replace("#NOVO-ITEM", "");
+
             return context.Response.WriteAsync(_repo.ParaLer.ToString());
         }
 
